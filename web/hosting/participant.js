@@ -80,6 +80,11 @@ let pc = null;
 let remoteStream = null;
 
 joinButton.onclick = async () => {
+  if (!broadcastInput.value) {
+    log('broadcast ID is required');
+    return;
+  }
+
   pc = new RTCPeerConnection(servers);
   pc.onicecandidatestatechange = (event) => {
     log('ice candidate state change', pc.iceConnectionState);

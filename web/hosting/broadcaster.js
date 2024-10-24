@@ -116,7 +116,6 @@ startButton.onclick = async () => {
   // Reference Firestore collections for signaling
   const requestsRef = collection(db, "broadcast_requests");
   const requestDoc = doc(requestsRef);
-  broadcastInput.value = requestDoc.id;
 
   // Create offer
   const offerDescription = await pc.createOffer();
@@ -139,6 +138,8 @@ startButton.onclick = async () => {
       log('broadcaster remote peer answer received');
       const answerDescription = new RTCSessionDescription(JSON.parse(atob(data.answer)));
       pc.setRemoteDescription(answerDescription);
+      // Delay revealing the broadcast input until the answer is received
+      broadcastInput.value = requestDoc.id;
     }
   });
 
