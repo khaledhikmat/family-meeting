@@ -168,7 +168,6 @@ func waitForOffer(canxCtx context.Context,
 	_ *firestore.Client,
 	reqDoc *firestore.DocumentRef) webrtc.SessionDescription {
 	// Wait until an offer is made by a requestor (kind)
-	// TODO: timeout after 5 minutes
 	iter := reqDoc.Snapshots(canxCtx)
 	defer iter.Stop()
 
@@ -264,7 +263,6 @@ func startBroadcaster(canxCtx context.Context,
 		return
 	}
 
-	// localTrackStream := make(chan *webrtc.TrackLocalStaticRTP)
 	localTrackStream := make(chan track)
 	defer close(localTrackStream)
 
@@ -315,11 +313,7 @@ func startBroadcaster(canxCtx context.Context,
 		return
 	}
 
-	// TODO: Wait until we connect with the remote broadcaster
-	// This is an atomic operation, we are not checking for context cancellation
-	//localTrack := <-localTrackStream
-	//fmt.Printf("startBroadcaster received a remote track\n")
-	var localTrack track //*webrtc.TrackLocalStaticRTP
+	var localTrack track
 
 	participantReqStream := monitorRequests(canxCtx, requestCanxCtx, requestCanxFn, errorStream, db, "participant", broadcastReq.ID)
 	fmt.Printf("startBroadcaster done setting up participants monitor\n")
