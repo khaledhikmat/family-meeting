@@ -307,7 +307,9 @@ func startBroadcaster(canxCtx context.Context,
 	<-gatherComplete
 
 	// Update the answer in the broacast request
-	_, err = broadcastReq.Update(canxCtx, []firestore.Update{{Path: "answer", Value: encode(peerConnection.LocalDescription())}})
+	_, err = broadcastReq.Update(canxCtx, []firestore.Update{{
+		Path: "answer", Value: encode(peerConnection.LocalDescription()),
+	}})
 	if err != nil {
 		errorStream <- fmt.Errorf("startBroadcaster broadcastReq.Update error: %v", err)
 		return
