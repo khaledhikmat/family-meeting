@@ -88,6 +88,9 @@ func Processor(canxCtx context.Context,
 			db,
 			string(msg.Data))
 	})
+	if err != nil {
+		return fmt.Errorf("broadcast proc receiving message error: %v", err)
+	}
 
 	for range canxCtx.Done() {
 		fmt.Printf("broadcast proc context cancelled: %v\n", canxCtx.Err())

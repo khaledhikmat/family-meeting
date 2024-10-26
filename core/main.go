@@ -53,6 +53,10 @@ func main() {
 	// Create a centralized error processor
 	go streamError(canxCtx, errorStream)
 
+	// Create a completion stream
+	completionStream := make(chan error)
+	defer close(completionStream)
+
 	mode := "monitor"
 	args := os.Args[1:]
 	if len(args) > 0 {
@@ -66,14 +70,21 @@ func main() {
 			if err != nil {
 				errorStream <- fmt.Errorf("mode processor error: %v", err)
 			}
+			completionStream <- err
 		}()
 	}
 
-	// Wait for cancellation
-	<-canxCtx.Done()
-	fmt.Printf("main context cancelled: %v\n", canxCtx.Err())
-	// Wait 4 seconds for all the go routines to exit
-	time.Sleep(4 * time.Second)
+	// Wait for completion
+	select {
+	case <-canxCtx.Done():
+		fmt.Printf("main context cancelled: %v\n", canxCtx.Err())
+		// Wait 4 seconds for all the go routines to exit
+		time.Sleep(4 * time.Second)
+		return
+	case <-completionStream:
+		fmt.Printf("main completed\n")
+		return
+	}
 }
 
 func streamError(canxCtx context.Context, errorStream chan error) {
