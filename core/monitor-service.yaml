@@ -1,0 +1,36 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: family-meeting-monitor
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/container-dependencies: "{app:[collector]}"
+    spec:
+      containers:
+      - image: khaledhikmat/family-meeting-core:latest
+        name: app
+        ports:
+        - containerPort: 8080
+        env:
+        - name: "RUN_TIME_ENV"
+          value: "dev"
+        - name: "APP_PORT"
+          value: "8080"
+        - name: "APP_NAME"
+          value: "monitor"
+        - name: "OTEL_EXPORTER_OTLP_ENDPOINT"
+          value: "http://localhost:4318"
+        - name: "OTEL_SERVICE_NAME" 
+          value: "family-meeting-core"
+        - name: "OTEL_GO_X_EXEMPLAR"
+          value: "true"
+      - image: khaledhikmat/family-meeting-collector:latest
+        name: collector
+        startupProbe:
+          httpGet:
+            path: /
+            port: 13133

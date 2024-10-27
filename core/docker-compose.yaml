@@ -1,0 +1,68 @@
+services:
+
+  collector:
+    image: khaledhikmat/family-meeting-collector:latest
+    command: ["--config", "/etc/otelcol-contrib/config.yaml"]
+    container_name: collector
+    volumes:
+      - ./telemetry/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml 
+      - /Users/khaled/gcp-creds/family-meeting-service-account-key.json:/Users/khaled/gcp-creds/family-meeting-service-account-key.json 
+    restart: always
+    environment:
+      GOOGLE_CLOUD_PROJECT: "family-meeting-aa853"
+      GOOGLE_APPLICATION_CREDENTIALS: "/Users/khaled/gcp-creds/family-meeting-service-account-key.json"
+    ports:
+      - "4318:4318"
+      - "4317:4317"
+
+  monitor:
+    depends_on:
+      - collector
+    image: khaledhikmat/family-meeting-core:latest
+    # Adding network_mode: "host" to allow the app to communicate with the signaling server
+    # Otherwise we will not receive OnTrack events
+    # But adding this network mode causes the service not to see localhost:8080 invocation from the host!!!
+    network_mode: "host"
+    container_name: monitor
+    volumes:
+      - /Users/khaled/gcp-creds/family-meeting-service-account-key.json:/Users/khaled/gcp-creds/family-meeting-service-account-key.json 
+    command: ["/main", "monitor"]
+    restart: always
+    environment:
+      DISABLE_TELEMETRY: "true"
+      GOOGLE_CLOUD_PROJECT: "family-meeting-aa853"
+      GOOGLE_APPLICATION_CREDENTIALS: "/Users/khaled/gcp-creds/family-meeting-service-account-key.json"
+      RUN_TIME_ENV: "dev"
+      APP_PORT: "8080"
+      APP_NAME: "monitor"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318"
+      OTEL_SERVICE_NAME: "family-meeting-core"
+      OTEL_GO_X_EXEMPLAR: true
+    ports:
+      - "8080:8080"
+
+  broadcast:
+    depends_on:
+      - collector
+    image: khaledhikmat/family-meeting-core:latest
+    # Adding network_mode: "host" to allow the app to communicate with the signaling server
+    # Otherwise we will not receive OnTrack events
+    # But adding this network mode causes the service not to see localhost:8080 invocation from the host!!!
+    network_mode: "host"
+    container_name: broadcast
+    volumes:
+      - /Users/khaled/gcp-creds/family-meeting-service-account-key.json:/Users/khaled/gcp-creds/family-meeting-service-account-key.json 
+    command: ["/main", "broadcast"]
+    restart: always
+    environment:
+      DISABLE_TELEMETRY: "true"
+      GOOGLE_CLOUD_PROJECT: "family-meeting-aa853"
+      GOOGLE_APPLICATION_CREDENTIALS: "/Users/khaled/gcp-creds/family-meeting-service-account-key.json"
+      RUN_TIME_ENV: "dev"
+      APP_PORT: "8081"
+      APP_NAME: "brodcast"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318"
+      OTEL_SERVICE_NAME: "family-meeting-core"
+      OTEL_GO_X_EXEMPLAR: true
+    ports:
+      - "8081:8081"

@@ -5,11 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/pubsub"
 	firebase "firebase.google.com/go/v4"
+	"github.com/mdobak/go-xerrors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+
+	"github.com/khaledhikmat/family-meeting/service/lgr"
 	"github.com/khaledhikmat/family-meeting/utils"
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/intervalpli"
@@ -19,9 +25,31 @@ import (
 const (
 	projectID            = "family-meeting-aa853"
 	abortWatcherInterval = 5 * time.Second
+	waitOnTrackTimeout   = 30 * time.Second
 	broadcastsTopic      = "broadcasts"
 	broadcastsSub        = "broadcasts-sub"
 )
+
+var (
+	meter = otel.Meter("family.meeting.broadcast")
+
+	receiveDuration metric.Int64Histogram
+)
+
+func init() {
+	var err error
+	receiveDuration, err = meter.Int64Histogram(
+		"family.meeting.broadcast.receive.duration",
+		metric.WithDescription("The distribution of receive durations"),
+		metric.WithUnit("ms"),
+	)
+	if err != nil {
+		lgr.Logger.Error(
+			"creating histogram",
+			slog.Any("error", xerrors.New(err.Error())),
+		)
+	}
+}
 
 // Must match the one configured in client JavaScript
 var peerConnectionConfig = webrtc.Configuration{
@@ -43,11 +71,15 @@ func Processor(canxCtx context.Context,
 	db *firestore.Client,
 	errorStream chan error) error {
 
-	fmt.Println("broadcast proc started")
+	lgr.Logger.Info("broadcast proc started")
 
 	client, err := pubsub.NewClient(canxCtx, projectID)
 	if err != nil {
-		return fmt.Errorf("error creating pubsub client: %v", err)
+		lgr.Logger.Error(
+			"creating pubsub client",
+			slog.Any("error", xerrors.New(err.Error())),
+		)
+		return err
 	}
 	defer client.Close()
 
@@ -57,11 +89,21 @@ func Processor(canxCtx context.Context,
 
 	ok, err := t.Exists(canxCtx)
 	if err != nil {
-		return fmt.Errorf("error checking topic %s existence: %v", broadcastsSub, err)
+		lgr.Logger.Error(
+			"checking topic",
+			slog.String("topic", broadcastsTopic),
+			slog.Any("error", xerrors.New(err.Error())),
+		)
+		return err
 	}
 
 	if !ok {
-		return fmt.Errorf("topic %s does not exist", broadcastsTopic)
+		lgr.Logger.Error(
+			"checking topic",
+			slog.String("topic", broadcastsTopic),
+			slog.Any("error", xerrors.New("topic does not exist")),
+		)
+		return err
 	}
 
 	// Make sure topic subscription exists
@@ -69,31 +111,56 @@ func Processor(canxCtx context.Context,
 
 	ok, err = sub.Exists(canxCtx)
 	if err != nil {
-		return fmt.Errorf("error checking sub %s existence: %v", broadcastsSub, err)
+		lgr.Logger.Error(
+			"checking topic sub",
+			slog.String("topic", broadcastsTopic),
+			slog.String("sub", broadcastsSub),
+			slog.Any("error", xerrors.New("topic subscription does not exist")),
+		)
+		return err
 	}
 
 	if !ok {
-		return fmt.Errorf("sub %s does not exist", broadcastsSub)
+		lgr.Logger.Error(
+			"checking topic sub",
+			slog.String("topic", broadcastsTopic),
+			slog.String("sub", broadcastsSub),
+			slog.Any("error", xerrors.New("topic sub does not exist")),
+		)
+		return err
 	}
 
 	// Consume events from the topic
 	// Receive blocks until a message is received or the context is cancelled
 	// There is more control: https://cloud.google.com/pubsub/docs/samples/pubsub-subscriber-concurrency-control?hl=en
 	err = sub.Receive(canxCtx, func(_ context.Context, msg *pubsub.Message) {
+		now := time.Now()
 		defer msg.Ack()
-		fmt.Printf("broadcast proc received message: %s\n", string(msg.Data))
+		lgr.Logger.Info("broadcast proc received message",
+			slog.String("msg", string(msg.Data)),
+		)
+
 		// Consume from a queue to start broadcasters
 		go startBroadcaster(canxCtx,
 			errorStream,
 			db,
 			string(msg.Data))
+
+		receiveDuration.Record(canxCtx, time.Since(now).Milliseconds())
 	})
 	if err != nil {
-		return fmt.Errorf("broadcast proc receiving message error: %v", err)
+		lgr.Logger.Error(
+			"broadcast proc receiving message",
+			slog.String("topic", broadcastsTopic),
+			slog.String("sub", broadcastsSub),
+			slog.Any("error", xerrors.New(err.Error())),
+		)
+
+		return err
 	}
 
 	for range canxCtx.Done() {
-		fmt.Printf("broadcast proc context cancelled: %v\n", canxCtx.Err())
+		lgr.Logger.Info("broadcast proc context cancelled")
 		return nil
 	}
 
@@ -171,10 +238,10 @@ func startBroadcaster(canxCtx context.Context,
 	// to connected peers
 	peerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		// WARNING: This should happen only once and arrives on its own goroutine
-		fmt.Println("startBroadcaster onTrack should happen only once")
+		lgr.Logger.Info("startBroadcaster onTrack should happen only once")
 		// TODO: For some reason, this happens more than once, we need to investigate why
 		// I am allowing this to happen
-		fmt.Println("startBroadcaster peerConnection.OnTrack from the remote broadcaster")
+		lgr.Logger.Info("startBroadcaster peerConnection.OnTrack from the remote broadcaster")
 		go onRemoteTrack(canxCtx, requestCanxCtx, errorStream, localTrackStream, remoteTrack, receiver)
 	})
 
@@ -216,12 +283,7 @@ func startBroadcaster(canxCtx context.Context,
 		return
 	}
 
-	var localTrack track
-
-	participantReqStream := utils.MonitorRequests(canxCtx, requestCanxCtx, requestCanxFn, errorStream, db, "participant", broadcastReq.ID)
-	fmt.Printf("startBroadcaster done setting up participants monitor\n")
-
-	// Abort watcher
+	// Wait to receive cancellation or abort
 	go func() {
 		ticker := time.NewTicker(abortWatcherInterval)
 		defer ticker.Stop()
@@ -229,10 +291,10 @@ func startBroadcaster(canxCtx context.Context,
 		for {
 			select {
 			case <-canxCtx.Done():
-				fmt.Printf("abortWatcher context cancelled: %v\n", canxCtx.Err())
+				lgr.Logger.Info("abortWatcher context cancelled")
 				return
 			case <-requestCanxCtx.Done():
-				fmt.Printf("abortWatcher request context cancelled: %v\n", canxCtx.Err())
+				lgr.Logger.Info("abortWatcher request context cancelled")
 				return
 			case <-ticker.C:
 				reqRef := db.Collection("broadcast_requests")
@@ -250,7 +312,9 @@ func startBroadcaster(canxCtx context.Context,
 				}
 
 				if request.Abort {
-					fmt.Printf("abortWatcher aborting the broadcast %s\n", broadcastReq.ID)
+					lgr.Logger.Info("abortWatcher aborting the broadcast",
+						slog.String("broadcast", broadcastReq.ID),
+					)
 					requestCanxFn()
 					return
 				}
@@ -258,26 +322,62 @@ func startBroadcaster(canxCtx context.Context,
 		}
 	}()
 
+	var localTrack track
 	var canxFn context.CancelFunc
+
+	// Timer to wait for a remote track to arrive
+	// Unfortunately, this means that the broadcaster will wait for a track to arrive within this time
+	// This also means that the broadcaster will not be able to process participant requests until this time expires
+	// The reason we don't proceed once a track arrives is because it is possible (based on experimentation)
+	// that the onTrack event is called multiple times
+	timer := time.NewTimer(waitOnTrackTimeout)
+	defer timer.Stop()
+
+	// Wait to receive cancellation, local track or timeout
+	for {
+		select {
+		case <-canxCtx.Done():
+			lgr.Logger.Info("startBroadcaster context cancelled")
+			return
+		case <-requestCanxCtx.Done():
+			lgr.Logger.Info("startBroadcaster request context cancelled")
+			return
+		case <-timer.C:
+			// Timer expired, resume with waiting on participant requests
+			lgr.Logger.Info(
+				"startBroadcaster timeout to receive a remote track occurred. Resume.",
+			)
+			goto resume
+		case localTrack = <-localTrackStream:
+			lgr.Logger.Info("startBroadcaster received a remote track. Now I can accept participants")
+			if canxFn != nil {
+				lgr.Logger.Info("startBroadcaster received a remote track. Cancelling previous track context")
+				canxFn()
+			}
+			canxFn = localTrack.CtxFn
+		}
+	}
+
+resume:
+	// if the local track is still nil, the broadcaster will exit immediately
+	if localTrack.Track == nil {
+		errorStream <- fmt.Errorf("startBroadcaster did not receive a track in %v. Exiting", waitOnTrackTimeout)
+		return
+	}
+
+	// Monitor participant requests
+	participantReqStream := utils.MonitorRequests(canxCtx, requestCanxCtx, requestCanxFn, errorStream, db, "participant", broadcastReq.ID)
 
 	// Wait to receive participant requests
 	for {
 		select {
 		case <-canxCtx.Done():
-			fmt.Printf("startBroadcaster context cancelled: %v\n", canxCtx.Err())
+			lgr.Logger.Info("startBroadcaster context cancelled")
 			return
 		case <-requestCanxCtx.Done():
-			fmt.Printf("startBroadcaster request context cancelled: %v\n", requestCanxCtx.Err())
+			lgr.Logger.Info("startBroadcaster request context cancelled")
 			return
-		case localTrack = <-localTrackStream:
-			fmt.Printf("startBroadcaster received a remote track. Now I can accept participants\n")
-			if canxFn != nil {
-				fmt.Printf("startBroadcaster received a remote track. Cancelling previous track context\n")
-				canxFn()
-			}
-			canxFn = localTrack.CtxFn
 		case participantReqDoc := <-participantReqStream:
-			// WARNING: if the localTrack is nil, startParticipant will exit immediately
 			go startParticipant(canxCtx, requestCanxCtx, errorStream, db, participantReqDoc.Ref, localTrack.Track)
 		}
 	}
@@ -289,7 +389,7 @@ func onRemoteTrack(canxCtx context.Context,
 	localTrackStream chan track,
 	remoteTrack *webrtc.TrackRemote,
 	_ *webrtc.RTPReceiver) {
-	fmt.Println("onRemoteTrack should happen only once")
+	lgr.Logger.Info("onRemoteTrack should happen only once")
 	// But I have noticed that it happens more than once
 	// So I am creating a child context for each track
 	// this way I can cancel the track context when a new one arrives
@@ -316,13 +416,19 @@ func onRemoteTrack(canxCtx context.Context,
 	for {
 		select {
 		case <-myCanxCtx.Done():
-			fmt.Printf("onRemoteTrack %p my context cancelled: %v\n", localTrack, myCanxCtx.Err())
+			lgr.Logger.Info("onRemoteTrack my context cancelled",
+				slog.Any("track", localTrack),
+			)
 			return
 		case <-canxCtx.Done():
-			fmt.Printf("onRemoteTrack %p context cancelled: %v\n", localTrack, canxCtx.Err())
+			lgr.Logger.Info("onRemoteTrack context cancelled",
+				slog.Any("track", localTrack),
+			)
 			return
 		case <-requestCanxCtx.Done():
-			fmt.Printf("onRemoteTrack %p request context cancelled: %v\n", localTrack, requestCanxCtx.Err())
+			lgr.Logger.Info("onRemoteTrack request context cancelled",
+				slog.Any("track", localTrack),
+			)
 			return
 		default:
 			i, _, readErr := remoteTrack.Read(rtpBuf)
@@ -347,7 +453,7 @@ func startParticipant(canxCtx context.Context,
 	participantReq *firestore.DocumentRef,
 	localTrack *webrtc.TrackLocalStaticRTP) {
 	participantOffer := utils.WaitForOffer(canxCtx, requestCanxCtx, errorStream, db, participantReq)
-	fmt.Printf("startParticipant received offer from a participant\n")
+	lgr.Logger.Info("startParticipant received offer from a participant")
 	if localTrack == nil {
 		errorStream <- fmt.Errorf("startParticipant localTrack is nil. Exiting")
 		return
@@ -374,10 +480,10 @@ func startParticipant(canxCtx context.Context,
 		for {
 			select {
 			case <-canxCtx.Done():
-				fmt.Printf("startParticipant RTCP context cancelled: %v\n", canxCtx.Err())
+				lgr.Logger.Info("startParticipant RTCP context cancelled")
 				return
 			case <-requestCanxCtx.Done():
-				fmt.Printf("startParticipant RTCP request context cancelled: %v\n", requestCanxCtx.Err())
+				lgr.Logger.Info("startParticipant RTCP request context cancelled")
 				return
 			default:
 				if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
@@ -432,10 +538,10 @@ func startParticipant(canxCtx context.Context,
 	for {
 		select {
 		case <-canxCtx.Done():
-			fmt.Printf("startParticipant context cancelled: %v\n", canxCtx.Err())
+			lgr.Logger.Info("startParticipant context cancelled")
 			return
 		case <-requestCanxCtx.Done():
-			fmt.Printf("startParticipant request context cancelled: %v\n", requestCanxCtx.Err())
+			lgr.Logger.Info("startParticipant request context cancelled")
 			return
 		}
 	}

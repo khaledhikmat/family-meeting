@@ -1,0 +1,30 @@
+version: 1
+common: # optional section for variables shared across apps
+  env:  # any environment variable shared across apps
+    DEBUG: true
+    GOOGLE_CLOUD_PROJECT: "family-meeting-aa853"
+    GOOGLE_APPLICATION_CREDENTIALS: "/Users/khaled/gcp-creds/family-meeting-service-account-key.json"
+    RUN_TIME_ENV: "dev"
+    DISABLE_TELEMETRY: "true"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318"
+    OTEL_SERVICE_NAME: "family-meeting-core"
+    OTEL_GO_X_EXEMPLAR: true
+apps:
+  - appID: family-meeting-monitor
+    appDirPath: ./
+    appPort: 8080
+    daprHTTPPort: 3500
+    logLevel: debug
+    command: ["go","run", "main.go", "monitor"]
+    env:
+      APP_PORT: 8080
+      APP_NAME: "monitor"
+  - appID: family-meeting-broadcast
+    appDirPath: ./
+    appPort: 8081
+    daprHTTPPort: 3501
+    logLevel: debug
+    command: ["go","run", "main.go", "broadcast"]
+    env:
+      APP_PORT: 8081
+      APP_NAME: "broadcast"

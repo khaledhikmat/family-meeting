@@ -25,16 +25,32 @@ This project consists of two main repos:
 - Meeting manager has visibility on all agents. Challenge: the meeting manager must be on the same server as the agents. Otherwise the connection will be quite slow. This means that meetings must be conducted on the same server.
 - How do we convert RTSP to WebRTC? This is to handle IP-based cameras. There are some solutions based on [Pion](github.com/pion/webrtc/v4): [RTSPtoWeb](https://github.com/deepch/RTSPtoWeb).
 - The backend of this will be Firestore to track calls, offers and answers. Both the particpant browsers and the Media server will be connected to the same Firebase database. 
-- The media server will be a headless server written in Go and deployed on GCP as Cloud Run and able to communicate with a Firebase database to receive WebRTC offers and respond with answers. This way it establishes WebRTC link with each WebRTC stream.  
+- The media server will be a headless server written in Go and deployed on GCP as GKS Service and able to communicate with a Firebase database to receive WebRTC offers and respond with answers. This way it establishes WebRTC link with each WebRTC stream.  
 
 ## To Do
 
-- Github repository.
+*Please note that Google Cloud Run is not applicable to run a payload like `monitor` and `broarcast` services. This is because Cloud Run is a serverless service and meant to serve API Endpoints only or Job. Background headless processes do not work in Cloud Run env because the platform might evict the service if it has not received any API access.*
+
+*Given this, I must admit that, so far, I have not seen better than Azure Container Apps where these headless workloads can run well with ease. Isay ease because there is no need to setup K8s clusters. The alternative to Google Cloud Run within GCP is a GKS cluster which is a huge undertaking (opertationl and cost).*
+
 - Security rules for database.
-- Connect to Firestore from Go.
-- Install gcloud CLI.
 - Genkit in Go.
 - Google OTEL.
+    - Still unable to see metrics properly.
+    - localhost:4318 is not reachable.
+- Firebase deployment from CLI.
+- Firebase deployment from CICD.
+- Firebase collection delete docs.
+- GKS (Autopilot) deployment from CICD.
+- GKS (Autopilot) deployment from CLI.
+- GKS (Autopilot) deployment from Terraform.
+    - Firebase databse.
+    - Pubsub Topic.
+    - 2 services: monitor and broadcast.
+    - How would I provide an authentication to pubsub and firebase from a GKS workload? They have something called [workload-identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity)
+
+- Abstract PubSub.
+- Disallow more than 3 broadcasts per instance.
 
 
 
