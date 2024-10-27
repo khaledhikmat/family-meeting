@@ -51,6 +51,7 @@ This project consists of two main repos:
 
 - Abstract PubSub.
 - Disallow more than 3 broadcasts per instance.
+- Increase the UDP buffer so we don't lose data!
 
 
 
