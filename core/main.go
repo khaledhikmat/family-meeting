@@ -139,9 +139,17 @@ func main() {
 				"main context cancelled",
 			)
 			goto resume
-		case <-completionStream:
+		case e := <-completionStream:
+			if e != nil {
+				lgr.Logger.Error(
+					"main mode prod completed with error",
+					slog.Any("error", xerrors.New(e.Error())),
+				)
+				goto resume
+			}
+
 			lgr.Logger.Info(
-				"main mode proc completed",
+				"main mode proc completed without error",
 			)
 			goto resume
 		case e := <-errorStream:
@@ -177,10 +185,19 @@ resume:
 				slog.Duration("period", waitOnShutdown),
 			)
 			return
-		case <-completionStream:
+		case e := <-completionStream:
+			if e != nil {
+				lgr.Logger.Error(
+					"main mode prod completed with error",
+					slog.Any("error", xerrors.New(e.Error())),
+				)
+				return
+			}
+
 			lgr.Logger.Info(
-				"main mode proc completed",
+				"main mode proc completed without error",
 			)
+			return
 		case e := <-errorStream:
 			// Handle error received on errorStream
 			lgr.Logger.Error(
