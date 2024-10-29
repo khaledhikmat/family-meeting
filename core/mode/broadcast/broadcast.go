@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -405,13 +406,51 @@ func onRemoteTrack(canxCtx context.Context,
 		return
 	}
 
-	// WARNING: This is a blocking operation in case onRemoteTrack is called multiple times
+	// Form a track object to stream to the localTrackStream
 	localTrackStream <- track{
 		Ctx:   myCanxCtx,
 		CtxFn: myCanxFn,
 		Track: localTrack,
 	}
 
+	// Stream the incoming RTP packets to the local track
+	// Buffer the packets to avoid blocking the RTP stream
+	rtpStream := make(chan []byte, 100)
+	defer close(rtpStream)
+
+	// Create a goroutine to stream the RTP packets to the local track
+	go func() {
+		if os.Getenv("EXPERIMENT_RTP_SEP_RW") != "true" {
+			return
+		}
+
+		for {
+			select {
+			case <-myCanxCtx.Done():
+				lgr.Logger.Info("rtpStreamer my context cancelled",
+					slog.Any("track", localTrack),
+				)
+				return
+			case <-canxCtx.Done():
+				lgr.Logger.Info("rtpStreamer context cancelled",
+					slog.Any("track", localTrack),
+				)
+				return
+			case <-requestCanxCtx.Done():
+				lgr.Logger.Info("rtpStreamer request context cancelled",
+					slog.Any("track", localTrack),
+				)
+				return
+			case data := <-rtpStream:
+				if _, err := localTrack.Write(data); err != nil && !errors.Is(err, io.ErrClosedPipe) {
+					errorStream <- fmt.Errorf("rtpStreamer %p localTrack.Write error: %v", localTrack, err)
+					continue
+				}
+			}
+		}
+	}()
+
+	// Read RTP data and stream it to be broadcasted to WebRTC peers
 	rtpBuf := make([]byte, 1400)
 	for {
 		select {
@@ -434,6 +473,14 @@ func onRemoteTrack(canxCtx context.Context,
 			i, _, readErr := remoteTrack.Read(rtpBuf)
 			if readErr != nil {
 				//errorStream <- fmt.Errorf("onRemoteTrack remoteTrack.Read error: %v", readErr)
+				continue
+			}
+
+			// EXPERIMENTATION:
+			// Separate reading RTP packets from writing RTP packets to local track
+			// Hopefully this will solve pixalation issues at the peers
+			if os.Getenv("EXPERIMENT_RTP_SEP_RW") == "true" {
+				rtpStream <- rtpBuf[:i]
 				continue
 			}
 

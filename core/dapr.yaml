@@ -28,3 +28,4 @@ apps:
     env:
       APP_PORT: 8081
       APP_NAME: "broadcast"
+      EXPERIMENT_RTP_SEP_RW: "false"
