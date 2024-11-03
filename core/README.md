@@ -1,3 +1,15 @@
+Please note the following about this project:
+
+- Implement SFU (Selective Forwarding Unit) to support presentation meeting rooms. There are some solutions such as [mediasoup](https://mediasoup.org/) that provides WebRTC Video Conferencing. Here is a simple project that demos mediasoup: [https://github.com/mkhahani/mediasoup-sample-app/tree/master](https://github.com/mkhahani/mediasoup-sample-app/tree/master).
+- Each remote WebRTC stream will be managed by a server broadcast manager. 
+- The broadcast manager always answers offers...it never initiates an offer.
+- Broadcast manager has visibility on all agents. Challenge: the meeting manager must be on the same server as the agents. Otherwise the connection will be quite slow. This means that meetings must be conducted on the same server.
+- How do we convert RTSP to WebRTC? This is to handle IP-based cameras. There are some solutions based on [Pion](github.com/pion/webrtc/v4): [RTSPtoWeb](https://github.com/deepch/RTSPtoWeb).
+- The backend of this will be Firestore to track calls, offers and answers. Both the particpant browsers and the Media server will be connected to the same Firestore database. 
+- The media server will be a headless server written in Go and deployed on GCP as GKS Service and able to communicate with a Firestire database to receive WebRTC offers and respond with answers. This way it establishes WebRTC link with each WebRTC stream.  
+
+## Go Module
+
 ```bash
 go mod init github.com/khaledhikmat/family-meeting
 go get -u github.com/pion/webrtc/v4
@@ -78,7 +90,7 @@ docker container run --platform linux/amd64 -it -p 8080:8080 \
 khaledhikmat/family-meeting-core:latest
 ```
 
-## Run Locally
+## Run Core Locally
 
 ### Standalone
 
@@ -155,4 +167,29 @@ Either control-c or :
 ```bash
 docker compose down
 ```
+
+## Run Web Locally
+
+Please refer to the [web READNE](../web/README.md) to see how you can start the web locally.
+
+## Things to do
+
+- Security rules for database.
+- Genkit in Go.
+- Google OTEL.
+    - Still unable to see metrics properly.
+    - localhost:4318 is not reachable.
+- Firebase deployment from CLI.
+- Firebase deployment from CICD.
+- Firebase collection delete docs.
+- GKS (Autopilot) deployment from Terraform.
+    - Firebase databse.
+    - Pubsub Topic.
+    - 2 services: monitor and broadcast.
+    - How would I provide an authentication to pubsub and firebase from a GKS workload? They have something called [workload-identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity)
+
+- Abstract PubSub.
+- Disallow more than 3 broadcasts per instance.
+- Increase the UDP buffer so we don't lose data!
+
 
