@@ -2,6 +2,7 @@ Please note the following about this project:
 
 - This is some experimentation with Terraform to deploy to GKS. I have not had a great access. I am finding that, unlike AWS EKS, GKS is a little difficult to work with in Terraform. Please refer to [anomalies below](#anomalies).
 - I did not actually complete the Terraform code because I was not able to make the initial Nginx deployment work consistently using workload identity. 
+- Moving `Core` to deploy on AWS EKS using AWS resources (asuch as EKS and SQS) is easy. But then we must deal with Firestore being in Google Cloud which complicates credentials using Service Account. 
 
 ## Run Locally
 

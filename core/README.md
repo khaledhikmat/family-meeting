@@ -1,7 +1,7 @@
 Please note the following about this project:
 
 - This is an attempt to implement SFU (Selective Forwarding Unit) to support meeting broadcasts. There are some solutions such as [mediasoup](https://mediasoup.org/) that provides WebRTC Video Conferencing. Here is a simple project that demos mediasoup: [https://github.com/mkhahani/mediasoup-sample-app/tree/master](https://github.com/mkhahani/mediasoup-sample-app/tree/master).
-- There are two modes: `Monitor` and a 'Broadcast`. `Monitor` is responsible to detect an initial offer from a broadcaster and delegates the request (via a pub/sub topic) to a `Broadcast`.
+- There are two modes: `Monitor` and `Broadcast`. `Monitor` is responsible to detect an initial offer from a broadcaster and delegate requests (via a pub/sub topic) to `Broadcast`.
 - The `Broadcast` launches a separate asynchronous process to deal with each broadcast request. The broadcast manager always answers offers...it never initiates an offer.
 - Each connected `Participant` runs asynchronously to establish a particular connection using WebRTC offer/answer negotiation. 
 - The backend of this is Firestore to track calls, offers and answers. 
@@ -171,7 +171,7 @@ docker compose down
 
 ## Run Web Locally
 
-Please refer to the [web READNE](../web/README.md) to see how you can start the web locally.
+Please refer to the [web README](../web/README.md) to see how you can start the web locally.
 
 ## Things to do
 
