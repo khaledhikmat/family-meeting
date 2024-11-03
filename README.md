@@ -29,9 +29,9 @@ This project consists of two main repos:
 
 ## To Do
 
-*Please note that Google Cloud Run is not applicable to run a payload like `monitor` and `broarcast` services. This is because Cloud Run is a serverless service and meant to serve API Endpoints only or Job. Background headless processes do not work in Cloud Run env because the platform might evict the service if it has not received any API access.*
+*Please note that Google Cloud Run is not applicable to run a payload like `monitor` and `broadcast` services. This is because Cloud Run is a serverless service and meant to serve API Endpoints only or Job. Background headless processes do not work in Cloud Run env because the platform might evict the service if it has not received any API access.*
 
-*Given this, I must admit that, so far, I have not seen better than Azure Container Apps where these headless workloads can run well with ease. Isay ease because there is no need to setup K8s clusters. The alternative to Google Cloud Run within GCP is a GKS cluster which is a huge undertaking (opertationl and cost).*
+*Given this, I must admit that, so far, I have not seen better than Azure Container Apps where these headless workloads can run well with ease. I say ease because there is no need to setup K8s clusters. The alternative to Google Cloud Run within GCP is a GKS cluster which is a huge undertaking (opertationl and cost).*
 
 - Security rules for database.
 - Genkit in Go.
@@ -41,8 +41,6 @@ This project consists of two main repos:
 - Firebase deployment from CLI.
 - Firebase deployment from CICD.
 - Firebase collection delete docs.
-- GKS (Autopilot) deployment from CICD.
-- GKS (Autopilot) deployment from CLI.
 - GKS (Autopilot) deployment from Terraform.
     - Firebase databse.
     - Pubsub Topic.

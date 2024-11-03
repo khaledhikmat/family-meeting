@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gs-public-lb
+spec:
+  type: LoadBalancer
+  loadBalancerIP: ""
+  selector:
+    app: nginx
+    microservice: gs
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: web

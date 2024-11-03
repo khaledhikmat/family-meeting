@@ -11,6 +11,21 @@ go get -u go.opentelemetry.io/contrib/propagators/autoprop
 go get -u github.com/gin-gonic/gin
 ```
 
+## Env Variables
+
+| NAME           | DEFAULT | DESCRIPTION       |
+|----------------|-----|------------------|
+| APP_NAME       | `none`  | Name of the microservice to appear in OTEL. |
+| APP_PORT       | `8080`  | HTTP Server port. Required to expose API Endpoints. |
+| GOOGLE_CLOUD_PROJECT     | `family-meeting-aa853`  | Google Cloud project name.   |
+| GOOGLE_APPLICATION_CREDENTIALS     | `/local/dir`  | Provides Service Account credentials for the Google project.   |
+| DISABLE_TELEMETRY     | `false`  | If `true`, it disables collecting OTEL telemetry signals.   |
+| OTEL_EXPORTER_OTLP_ENDPOINT     | `http://localhost:4318`  | OTEL endpoint.   |
+| OTEL_SERVICE_NAME     | `family-meeting-core`  | OTEL application name.   |
+| OTEL_GO_X_EXEMPLAR     | `true`  | OTEL GO.   |
+| EXPERIMENT_RTP_SEP_RW  | 'false`  | If `true`, it experiments with sending RTP packets through a local channel.  |
+| RUN_TIME_ENV  | 'dev`  | Runetime env name.  |
+
 ## Setup Roles
 
 In order to get access to pub/sub, we must [install the gloud CLI](https://cloud.google.com/sdk/docs/install-sdk) and add the pubsub role to the service account:
@@ -67,7 +82,7 @@ khaledhikmat/family-meeting-core:latest
 
 ### Standalone
 
-*This expects that the Google Collector be running*
+*This expects that the Google Collector be running or that the OTEL collection be disabled.*
 
 - Setup Credentials on each terminal below:
 

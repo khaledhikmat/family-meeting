@@ -418,7 +418,7 @@ func onRemoteTrack(canxCtx context.Context,
 	rtpStream := make(chan []byte, 100)
 	defer close(rtpStream)
 
-	// Create a goroutine to stream the RTP packets to the local track
+	// Create a goroutine to stream RTP packets to the local track
 	go func() {
 		if os.Getenv("EXPERIMENT_RTP_SEP_RW") != "true" {
 			return

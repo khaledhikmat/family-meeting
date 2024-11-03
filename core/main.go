@@ -173,6 +173,8 @@ resume:
 		"main is waiting for all go routines to exit",
 	)
 
+	// The only way to exit the main function is to wait for the shutdown
+	// duration
 	timer := time.NewTimer(waitOnShutdown)
 	defer timer.Stop()
 
@@ -197,7 +199,6 @@ resume:
 			lgr.Logger.Info(
 				"main mode proc completed without error",
 			)
-			return
 		case e := <-errorStream:
 			// Handle error received on errorStream
 			lgr.Logger.Error(
