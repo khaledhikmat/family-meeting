@@ -1,12 +1,13 @@
 Please note the following about this project:
 
-- Implement SFU (Selective Forwarding Unit) to support presentation meeting rooms. There are some solutions such as [mediasoup](https://mediasoup.org/) that provides WebRTC Video Conferencing. Here is a simple project that demos mediasoup: [https://github.com/mkhahani/mediasoup-sample-app/tree/master](https://github.com/mkhahani/mediasoup-sample-app/tree/master).
-- Each remote WebRTC stream will be managed by a server broadcast manager. 
-- The broadcast manager always answers offers...it never initiates an offer.
-- Broadcast manager has visibility on all agents. Challenge: the meeting manager must be on the same server as the agents. Otherwise the connection will be quite slow. This means that meetings must be conducted on the same server.
-- How do we convert RTSP to WebRTC? This is to handle IP-based cameras. There are some solutions based on [Pion](github.com/pion/webrtc/v4): [RTSPtoWeb](https://github.com/deepch/RTSPtoWeb).
-- The backend of this will be Firestore to track calls, offers and answers. Both the particpant browsers and the Media server will be connected to the same Firestore database. 
-- The media server will be a headless server written in Go and deployed on GCP as GKS Service and able to communicate with a Firestire database to receive WebRTC offers and respond with answers. This way it establishes WebRTC link with each WebRTC stream.  
+- This is an attempt to implement SFU (Selective Forwarding Unit) to support meeting broadcasts. There are some solutions such as [mediasoup](https://mediasoup.org/) that provides WebRTC Video Conferencing. Here is a simple project that demos mediasoup: [https://github.com/mkhahani/mediasoup-sample-app/tree/master](https://github.com/mkhahani/mediasoup-sample-app/tree/master).
+- There are two modes: `Monitor` and a 'Broadcast`. `Monitor` is responsible to detect an initial offer from a broadcaster and delegates the request (via a pub/sub topic) to a `Broadcast`.
+- The `Broadcast` launches a separate asynchronous process to deal with each broadcast request. The broadcast manager always answers offers...it never initiates an offer.
+- Each connected `Participant` runs asynchronously to establish a particular connection using WebRTC offer/answer negotiation. 
+- The backend of this is Firestore to track calls, offers and answers. 
+- Each remote WebRTC stream is managed by a broadcast manager. 
+
+*There is a more difficult variation to this approach which is to allow the monitor to connect to the stream of IP-based cameras using RTSP and convert to WebRTC. Once it is in WebRTC, it can be broadcasted to connected WebRTC browsers. There are some solutions based on [Pion](github.com/pion/webrtc/v4): [RTSPtoWeb](https://github.com/deepch/RTSPtoWeb).*
 
 ## Go Module
 
