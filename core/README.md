@@ -36,8 +36,8 @@ go get -u github.com/gin-gonic/gin
 | OTEL_EXPORTER_OTLP_ENDPOINT     | `http://localhost:4318`  | OTEL endpoint.   |
 | OTEL_SERVICE_NAME     | `family-meeting-core`  | OTEL application name.   |
 | OTEL_GO_X_EXEMPLAR     | `true`  | OTEL GO.   |
-| EXPERIMENT_RTP_SEP_RW  | 'false`  | If `true`, it experiments with sending RTP packets through a local channel.  |
-| RUN_TIME_ENV  | 'dev`  | Runetime env name.  |
+| EXPERIMENT_RTP_SEP_RW  | `false`  | If `true`, it experiments with sending RTP packets through a local channel.  |
+| RUN_TIME_ENV  | `dev`  | Runetime env name.  |
 
 ## Setup Roles
 
